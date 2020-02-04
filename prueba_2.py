@@ -1,53 +1,92 @@
-import numpy as np
-################################################################################
-## Escribimos el codigo a probar, sin usar "self" porque esto no es una clase ##
-################################################################################
-N=128 # N va a ser ahora un parametro del bloque
-def work(input_items, output_items):
-    in0 = input_items[0]
-    out0 = output_items[0]
-    out0[:]=abs(np.fft.fftshift(np.fft.fft(in0,N),1)) # ,1 es lo unico que cambio 
-    return len(out0)
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+# Lo de arriba es para que los IDE conozcan en que esta escrito este codigo 
+###########################################################
+# Puedes encontrar este codigo como objeto_ej4.py en:    ##
+# https://sites.google.com/saber.uis.edu.co/comdig/sw    ##
+###########################################################
+###           IMPORTACION DE LIBRERIAS                  ###
+###########################################################
+# Libreria obligatoria
+from gnuradio import gr
  
-###############################################################################
-##              PRUEBAS A LA FUNCION WORK                                    ##
-###############################################################################
-import math
-from matplotlib import pyplot as plt
+# Librerias particulares
+from gnuradio import analog
+from gnuradio import blocks
+from gnuradio.filter import firdes
  
-# Deinifimos la senal entrante
-f=1378.
-Fsamp= 8000. # la frecuencia de muestreo
+# Librerias para poder incluir graficas tipo QT
+from gnuradio import qtgui
+from PyQt5 import Qt # si no se acepta PyQt4 cambie PyQt4 por PyQt5
+import sys, sip
  
-n=np.linspace(0,N-1,N)
-t=n/Fsamp
+# Ahora debes importar tu libreria. A continuacion suponemos que tu libreria ha sido
+# guardada en un archivo llamado lib_comdig_code.py
+import e_vector_fft_ff as misbloques1
+
+import e_add_ff as misbloques2
  
-# Tambien cambio la manera en que las senales se expresan en las pruebas:
-# para presentar la senal como una matriz de prueba, vamos a suponer que cada
-# N muestras la senal presenta una pequena desviacion de frec
-signal0=np.cos(2.*math.pi*f*t)
-signal1=np.cos(2.*math.pi*(f+100)*t)
-signal2=np.cos(2.*math.pi*(f-60)*t)
+###########################################################
+###           LA CLASE DEL FLUJOGRAMA                   ###
+###########################################################
+class flujograma(gr.top_block):
+    def __init__(self):
+        gr.top_block.__init__(self)
  
-# creamos el array 2d para la senal entrante y saliente
-in_sig=np.array([signal0,signal1,signal2])    # array 3xN
-out_sig=np.array([0.]*N)                      # array 1xN
-out_sig=np.array([out_sig, out_sig, out_sig]) # arrat 3xN
+        ################################################
+        ###   EL FLUJOGRAMA                          ###
+        ################################################
  
-# Pasamos a array 3d las dos senales ya que es necesario introducir la dimension
-# que en GNU radio debe ser destinada para identificar las posibles entradas y salidas
-# que puede tener un bloque
-in_sig= np.array([in_sig])   # array 1x3xN
-out_sig=np.array([out_sig])  # array 1x3xN
+        # Las variables usadas en el flujograma
+        samp_rate = 32000
+        f=1000
+        N= 128
+        # Los bloques
+        src = analog.sig_source_f(samp_rate, analog.GR_SIN_WAVE, f, 1, 0)
+        nse = analog.noise_source_f(analog.GR_GAUSSIAN, 0.1)
+        add = misbloques2.e_add_ff(1.0)
+        snk = qtgui.time_sink_f(
+            512, # numero de muestras en la ventana del osciloscopio
+            samp_rate,
+            "senal promediada", # nombre que aparece en la grafica
+            1 # Nuemero de entradas del osciloscopio
+        )
+        str2vec=blocks.stream_to_vector(gr.sizeof_float*1, N)
+        e_fft=misbloques1.e_vector_fft_ff(N)
+        vsnk = qtgui.vector_sink_f(
+            N,
+            -samp_rate/2.,
+            samp_rate/N,
+            "frecuencia",
+            "Magnitud",
+            "FT en Magnitud",
+            1 # Number of inputs
+        )
+        vsnk.enable_autoscale(True)
+        # Las conexiones
+        self.connect(src, (add, 0))
+        self.connect(nse, (add, 1))
+        self.connect(add, snk)
+        self.connect(add, str2vec, e_fft, vsnk)
  
-# Por fin comprobamos la funcion
-d=work(in_sig,out_sig)
+        # La configuracion para graficar
+        pyobj = sip.wrapinstance(vsnk.pyqwidget(), Qt.QWidget)
+        pyobj.show()
  
-# calculos para graficar
-Fmin=-Fsamp/2.
-Fresol=Fsamp/N
-Fmax=-Fmin-Fresol
-f=np.linspace(Fmin,Fmax,N)
-plt.plot(f,out_sig[0][0]) # para imprimir la salida 0, paquete 0
-plt.show()
+###########################################################
+###                LA CLASE PRINCIPAL                   ###
+###########################################################
+def main():
+    # Para que lo nuestro sea considerado una aplicación tipo QT GUI
+    qapp = Qt.QApplication(sys.argv)
+    simulador_de_la_envolvente_compleja = flujograma()
+    simulador_de_la_envolvente_compleja.start()
+    # Para arranque la parte grafica
+    qapp.exec_()
+    
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
 

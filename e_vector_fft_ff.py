@@ -1,12 +1,15 @@
+from gnuradio import gr
+import numpy as np
+ 
 ####################################################
 ##     clase e_vector_fft_ff                      ##
 ####################################################
 # En color rojo aparece aquello que hace que el bloque sea vectorial
- 
 class e_vector_fft_ff(gr.sync_block):
     """calcula la fft en magnitud a una senal vectorial de N muestras y emtrega N muestras del espectro. N deber ser potencia de 2"""
  
-    def __init__(self, N=128):  
+    def __init__(self, N=128):
+    
         gr.sync_block.__init__(
             self,
             name='e_vector_fft_ff',
